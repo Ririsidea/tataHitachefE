@@ -1,0 +1,98 @@
+import { useMemo, useState } from 'react';
+import { getStock } from '../services/api';
+import { useAsyncData } from '../hooks/useAsyncData';
+import { useCart } from '../context/CartContext';
+import AsyncState from '../components/AsyncState';
+import ProductRow from '../components/ProductRow';
+import Pagination from '../components/Pagination';
+import SearchInput from '../components/SearchInput';
+import QuickViewModal from '../components/QuickViewModal';
+
+const PAGE_SIZE = 10;
+
+export default function Shop({ onViewCart }) {
+  const { data, loading, error } = useAsyncData(getStock);
+  const { itemCount } = useCart();
+  const products = data?.data || [];
+
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [quickViewProductId, setQuickViewProductId] = useState(null);
+
+  const categories = useMemo(() => {
+    const set = new Set(products.map((p) => p.category || 'Uncategorized'));
+    return ['All', ...[...set].sort()];
+  }, [products]);
+
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return products.filter((p) => {
+      const inCategory = activeCategory === 'All' || (p.category || 'Uncategorized') === activeCategory;
+      if (!inCategory) return false;
+      if (!query) return true;
+      return p.title.toLowerCase().includes(query) || (p.sku || '').toLowerCase().includes(query);
+    });
+  }, [products, activeCategory, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const handleCategoryClick = (category) => {
+    setActiveCategory(category);
+    setPage(1);
+  };
+
+  const handleSearchChange = (value) => {
+    setSearch(value);
+    setPage(1);
+  };
+
+  return (
+    <div className="panel">
+      <div className="shop-header">
+        <h2>Shop</h2>
+        {itemCount > 0 && (
+          <button type="button" className="btn-primary" onClick={onViewCart}>
+            View Cart ({itemCount})
+          </button>
+        )}
+      </div>
+      <AsyncState
+        loading={loading}
+        error={error}
+        isEmpty={products.length === 0}
+        emptyLabel="No products found in Shopify."
+      />
+      {!loading && !error && products.length > 0 && (
+        <>
+          <SearchInput value={search} onChange={handleSearchChange} placeholder="Search products by name or SKU" />
+          <div className="category-pills">
+            {categories.map((category) => (
+              <button
+                key={category}
+                type="button"
+                className={category === activeCategory ? 'pill pill-active' : 'pill'}
+                onClick={() => handleCategoryClick(category)}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+          <AsyncState loading={false} error={null} isEmpty={filtered.length === 0} emptyLabel="No products match your search." />
+          {filtered.length > 0 && (
+            <div className="product-list">
+              {pageItems.map((p) => (
+                <ProductRow key={p.id} product={p} onQuickView={() => setQuickViewProductId(p.id)} />
+              ))}
+            </div>
+          )}
+          <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+        </>
+      )}
+      {quickViewProductId && (
+        <QuickViewModal productId={quickViewProductId} onClose={() => setQuickViewProductId(null)} />
+      )}
+    </div>
+  );
+}

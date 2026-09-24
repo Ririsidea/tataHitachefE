@@ -1,11 +1,12 @@
 html {
-  font: 15px/1.6 var(--font-sans);
+  font: 15px/1.55 var(--font-sans);
   color: var(--color-text-primary);
   background: var(--color-bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
 }
 
 * {
@@ -24,9 +25,16 @@ body {
   flex-direction: column;
 }
 
+::selection {
+  background: var(--color-primary-light);
+  color: var(--color-text-primary);
+}
+
 h1,
 h2,
-h3 {
+h3,
+h4,
+h5 {
   font-family: var(--font-sans);
   font-weight: 600;
   color: var(--color-text-primary);
@@ -35,35 +43,72 @@ h3 {
 
 h1 {
   font-size: 26px;
-  letter-spacing: -0.3px;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
 h2 {
-  font-size: 20px;
-  letter-spacing: -0.2px;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
 }
 
 h3 {
   font-size: 15px;
+  letter-spacing: -0.005em;
+}
+
+h4 {
+  font-size: 14px;
 }
 
 p {
   margin: 0;
 }
 
+a {
+  color: var(--color-primary);
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  color: var(--color-primary-hover);
+}
+
 .eyebrow {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-secondary);
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
 }
 
 code {
   font-family: var(--font-mono);
   font-size: 13px;
   padding: 2px 6px;
-  border-radius: 4px;
-  background: var(--color-bg-subtle);
+  border-radius: var(--radius-xs);
+  background: var(--color-bg-muted);
   color: var(--color-text-primary);
+}
+
+/* Keyboard focus: one consistent ring for every interactive element. */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+:where(input, select, textarea):focus-visible {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

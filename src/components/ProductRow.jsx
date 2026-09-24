@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useCart } from '../context/CartContext';
 import QuantityStepper from './QuantityStepper';
 import Badge from './Badge';
+import { CheckIcon } from './Icons';
 import { formatCurrency } from '../utils/formatters';
 
 function CartPlusIcon() {
@@ -23,7 +24,7 @@ function CartPlusIcon() {
 
 function EyeIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
         d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"
         stroke="currentColor"
@@ -55,47 +56,52 @@ export default function ProductRow({ product, onQuickView }) {
   };
 
   return (
-    <div className="product-row">
-      <div className="product-row-thumb">
+    <article className="product-card">
+      <div className="product-card-media">
         {product.imageUrl ? (
-          <img src={product.imageUrl} alt={product.title} />
+          <img src={product.imageUrl} alt={product.title} loading="lazy" decoding="async" />
         ) : (
-          <div className="product-row-thumb-placeholder">No image</div>
+          <div className="product-card-placeholder">No image</div>
         )}
       </div>
-      <div className="product-row-info">
-        <span className="product-row-title">{product.title}</span>
-        <span className="product-row-sku">{product.sku || 'No SKU'}</span>
+      <div className="product-card-body">
+        <h3 className="product-card-title" title={product.title}>
+          {product.title}
+        </h3>
+        <span className="product-card-sku" title={product.sku || 'No SKU'}>
+          {product.sku || 'No SKU'}
+        </span>
+        <span className="product-card-price">{formatCurrency(product.price)}</span>
       </div>
-      <div className="product-row-price">{formatCurrency(product.price)}</div>
-      <div className="product-row-controls">
-        <button
-          type="button"
-          className="icon-btn-ghost"
-          onClick={onQuickView}
-          aria-label={`Quick view ${product.title}`}
-          title="Quick view"
-        >
-          <EyeIcon />
-        </button>
-        {canOrder ? (
-          <>
-            <QuantityStepper value={qty} min={0} max={remaining} onChange={setQty} />
+      <div className="product-card-actions">
+        {canOrder && <QuantityStepper value={qty} min={0} max={remaining} onChange={setQty} />}
+        <div className="product-card-buttons">
+          <button
+            type="button"
+            className="icon-btn-ghost"
+            onClick={onQuickView}
+            aria-label={`Quick view ${product.title}`}
+            title="Quick view"
+          >
+            <EyeIcon />
+          </button>
+          {canOrder ? (
             <button
               type="button"
-              className={added ? 'icon-btn icon-btn-added' : 'icon-btn'}
+              className={added ? 'product-add-btn is-added' : 'product-add-btn'}
               disabled={qty <= 0}
               onClick={handleAdd}
               aria-label={`Add ${product.title} to cart`}
               title={added ? 'Added to cart' : 'Add to cart'}
             >
-              {added ? '✓' : <CartPlusIcon />}
+              {added ? <CheckIcon /> : <CartPlusIcon />}
+              <span>{added ? 'Added' : 'Add'}</span>
             </button>
-          </>
-        ) : (
-          <Badge tone="danger">{outOfStock ? 'Out of stock' : 'Not orderable'}</Badge>
-        )}
+          ) : (
+            <Badge tone="danger">{outOfStock ? 'Out of stock' : 'Not orderable'}</Badge>
+          )}
+        </div>
       </div>
-    </div>
+    </article>
   );
 }

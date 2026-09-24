@@ -6,6 +6,7 @@ import Spinner from './Spinner';
 import QuantityStepper from './QuantityStepper';
 import Badge from './Badge';
 import { formatCurrency } from '../utils/formatters';
+import { CloseIcon } from './Icons';
 
 const SWIPE_THRESHOLD = 40;
 
@@ -67,7 +68,7 @@ export default function QuickViewModal({ productId, onClose }) {
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal-panel" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
         <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">
-          ✕
+          <CloseIcon />
         </button>
 
         {loading && (

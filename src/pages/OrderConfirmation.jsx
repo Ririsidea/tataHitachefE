@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { CheckCircleIcon } from '../components/Icons';
 import { formatCurrency } from '../utils/formatters';
 
 export default function OrderConfirmation({ order, onBackToShop }) {
@@ -15,8 +16,13 @@ export default function OrderConfirmation({ order, onBackToShop }) {
   return (
     <div className="panel">
       <div className="confirmation-banner">
-        <h2>✓ Order Placed Successfully</h2>
-        <p className="hint">Your order has been created in Shopify and recorded in the MAP bridge.</p>
+        <span className="confirmation-icon">
+          <CheckCircleIcon size={28} />
+        </span>
+        <div>
+          <h2>Order Placed Successfully</h2>
+          <p className="hint">Your order has been created in Shopify and recorded in the MAP bridge.</p>
+        </div>
       </div>
       <div className="order-summary">
         <div className="order-summary-row">

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import PasswordInput from '../components/PasswordInput';
+import { AlertIcon, PackageIcon } from '../components/Icons';
 
 export default function Login({ infoMessage, onForgotPassword }) {
   const { login } = useAuth();
@@ -26,10 +27,20 @@ export default function Login({ infoMessage, onForgotPassword }) {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-brand">
+          <span className="auth-logo" aria-hidden="true">
+            <PackageIcon size={22} />
+          </span>
           <span className="auth-wordmark">TATA HITACHI</span>
         </div>
-        <h2>Log in</h2>
-        {infoMessage && <div className="result result-success">{infoMessage}</div>}
+        <div className="auth-heading">
+          <h2>Log in</h2>
+          <p className="hint">Sign in to the MAP Ordering Portal.</p>
+        </div>
+        {infoMessage && (
+          <div className="result result-success" role="status">
+            {infoMessage}
+          </div>
+        )}
         <form className="form" onSubmit={handleSubmit}>
           <label>
             Email
@@ -51,7 +62,12 @@ export default function Login({ infoMessage, onForgotPassword }) {
               required
             />
           </label>
-          {error && <div className="error">{error}</div>}
+          {error && (
+            <div className="error" role="alert">
+              <AlertIcon size={18} />
+              <span>{error}</span>
+            </div>
+          )}
           <button type="submit" className="btn-primary btn-block" disabled={submitting}>
             {submitting && <span className="spinner-btn" />}
             {submitting ? 'Logging in...' : 'Log in'}

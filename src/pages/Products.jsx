@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
-import { getStock } from '../services/api';
-import { useAsyncData } from '../hooks/useAsyncData';
+import { useStock } from '../hooks/useStock';
 import AsyncState from '../components/AsyncState';
+import ListSkeleton from '../components/ListSkeleton';
 import DataTable from '../components/DataTable';
 import SearchInput from '../components/SearchInput';
 import Pagination from '../components/Pagination';
+import { ImageIcon } from '../components/Icons';
 import { formatCurrency } from '../utils/formatters';
 
 const PAGE_SIZE = 10;
@@ -15,7 +16,9 @@ const COLUMNS = [
     label: '',
     render: (p) => (
       <div className="table-thumb">
-        {p.imageUrl ? <img src={p.imageUrl} alt={p.title} /> : <div className="table-thumb-placeholder">No image</div>}
+        {p.imageUrl ? <img src={p.imageUrl} alt={p.title} loading="lazy" decoding="async" /> : <div className="table-thumb-placeholder" role="img" aria-label="No image">
+            <ImageIcon size={18} />
+          </div>}
       </div>
     ),
   },
@@ -27,7 +30,7 @@ const COLUMNS = [
 ];
 
 export default function Products() {
-  const { data, loading, error } = useAsyncData(getStock);
+  const { data, loading, error } = useStock();
   const products = data?.data || [];
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -54,10 +57,11 @@ export default function Products() {
   return (
     <div className="panel">
       <h2>Products / Stock</h2>
+      {loading && <ListSkeleton />}
       <AsyncState
-        loading={loading}
-        error={error}
-        isEmpty={products.length === 0}
+        loading={false}
+        error={loading ? null : error}
+        isEmpty={!loading && products.length === 0}
         emptyLabel="No products found in Shopify."
       />
       {!loading && !error && products.length > 0 && (
@@ -65,7 +69,7 @@ export default function Products() {
           <SearchInput value={search} onChange={handleSearchChange} placeholder="Search products by name, SKU or category" />
           <AsyncState loading={false} error={null} isEmpty={filtered.length === 0} emptyLabel="No products match your search." />
           {pageItems.length > 0 && <DataTable columns={COLUMNS} rows={pageItems} rowKey={(p) => p.id} />}
-          <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+          <Pagination page={page} totalPages={totalPages} onChange={setPage} totalItems={filtered.length} pageSize={PAGE_SIZE} />
         </>
       )}
     </div>

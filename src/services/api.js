@@ -5,7 +5,45 @@ export const BACKEND_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, '');
 
 export const TOKEN_STORAGE_KEY = 'tata_h_auth_token';
 
-const client = axios.create({ baseURL: API_BASE_URL });
+// Two clients, two credentials:
+//   client    - employee JWT (Authorization: Bearer): login, /auth/me, admin, SAP.
+//   keyClient - the static MAP API key (x-api-key): every Shopify-related route (stock,
+//               product, orders, create/cancel/update). It never sends the JWT.
+// ngrok's free tier answers browser requests with an HTML warning page (which has no CORS
+// headers, so it surfaces as a CORS error) unless this header is present. The backend's CORS
+// config already allows it; it is only sent when the API is actually served through ngrok.
+const TUNNEL_HEADERS = /ngrok/i.test(API_BASE_URL) ? { 'ngrok-skip-browser-warning': 'true' } : {};
+
+const client = axios.create({ baseURL: API_BASE_URL, headers: TUNNEL_HEADERS });
+
+// The MAP API key comes from VITE_MAP_API_KEY in the frontend .env (Vite only exposes
+// VITE_-prefixed variables to browser code). It is compiled into the bundle.
+const MAP_API_KEY = import.meta.env.VITE_MAP_API_KEY;
+export const MAP_API_KEY_MISSING = !MAP_API_KEY;
+export const MAP_API_KEY_MISSING_MESSAGE =
+  'VITE_MAP_API_KEY is not set in the frontend .env - add it (same value as MAP_API_KEY in the backend .env) and restart "npm run dev".';
+if (MAP_API_KEY_MISSING) {
+  console.error(MAP_API_KEY_MISSING_MESSAGE);
+}
+const keyClient = axios.create({
+  baseURL: API_BASE_URL,
+  headers: { ...TUNNEL_HEADERS, ...(MAP_API_KEY ? { 'x-api-key': MAP_API_KEY } : {}) },
+});
+
+// No key configured: fail fast with a clear message instead of a silent 401 round-trip.
+if (MAP_API_KEY_MISSING) {
+  keyClient.interceptors.request.use(() => Promise.reject(new Error(MAP_API_KEY_MISSING_MESSAGE)));
+}
+// A 401 here means the key is wrong (or missing on the server) - it must NOT log the user out.
+keyClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && error.response.data) {
+      error.response.data.message = 'API key missing or invalid - check VITE_MAP_API_KEY in the frontend .env.';
+    }
+    return Promise.reject(error);
+  }
+);
 
 client.interceptors.request.use((config) => {
   const token = localStorage.getItem(TOKEN_STORAGE_KEY);
@@ -35,7 +73,10 @@ async function unwrap(promise) {
     return data;
   } catch (err) {
     const message = err.response?.data?.message || err.message;
-    throw new Error(message);
+    const error = new Error(message);
+    // Callers can branch on the HTTP status (e.g. 409 stock/fulfilled, 401 bad key, 502 Shopify).
+    error.status = err.response?.status;
+    throw error;
   }
 }
 
@@ -44,14 +85,23 @@ export const resetPassword = (email, newPassword) =>
   unwrap(client.post('/auth/reset-password', { email, newPassword }));
 export const getMe = () => unwrap(client.get('/auth/me'));
 
-export const getEvents = (limit = 50) => unwrap(client.get(`/dashboard/events?limit=${limit}`));
-export const getOrders = () => unwrap(client.get('/dashboard/orders'));
-export const getProducts = () => unwrap(client.get('/dashboard/products'));
-export const getStock = () => unwrap(client.get('/map/stock'));
-export const getProductDetail = (id) => unwrap(client.get(`/map/product/${id}`));
-export const createMapOrder = (payload) => unwrap(client.post('/map/create-order', payload));
-export const getOrderStatus = (id) => unwrap(client.get(`/map/order-status/${id}`));
-export const cancelOrder = (id) => unwrap(client.post(`/map/orders/${id}/cancel`));
+// ---- x-api-key routes (no JWT) -------------------------------------------------------
+// The orders list is scoped by the employee's email, taken from the logged-in profile.
+export const getOrders = (employeeEmail) =>
+  unwrap(keyClient.get('/dashboard/orders', { params: { employeeEmail } }));
+export const getProducts = () => unwrap(keyClient.get('/dashboard/products'));
+export const getStock = () => unwrap(keyClient.get('/map/stock'));
+export const getProductDetail = (id) => unwrap(keyClient.get(`/map/product/${id}`));
+export const createMapOrder = (payload) => unwrap(keyClient.post('/map/create-order', payload));
+export const getOrderStatus = (id) => unwrap(keyClient.get(`/map/order-status/${id}`));
+export const cancelOrder = (id) => unwrap(keyClient.post(`/map/orders/${id}/cancel`));
+export const updateOrder = (id, payload) => unwrap(keyClient.put(`/orders/${id}`, payload));
+// Live order for the Edit Order modal (address, contact, per-line unfulfilled quantity).
+export const getMapOrder = (id) => unwrap(keyClient.get(`/map/orders/${id}`));
+// Edit the order in Shopify. Resolves for 200 AND 207 (partial: check res.partial).
+export const editMapOrder = (id, payload) => unwrap(keyClient.put(`/map/orders/${id}`, payload));
+
+// ---- JWT routes ----------------------------------------------------------------------
 export const exportDaily = () => unwrap(client.post('/sap/export-daily'));
 
 // Employee Orders page: one row per daily export, not per order.

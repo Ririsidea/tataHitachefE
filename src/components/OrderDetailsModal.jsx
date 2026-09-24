@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import Badge, { toneForStatus } from './Badge';
 import { formatCurrency } from '../utils/formatters';
+import { CloseIcon } from './Icons';
 
 export default function OrderDetailsModal({ order, productsBySku, onClose }) {
   useEffect(() => {
@@ -21,7 +22,7 @@ export default function OrderDetailsModal({ order, productsBySku, onClose }) {
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal-panel order-details-panel" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
         <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">
-          ✕
+          <CloseIcon />
         </button>
 
         <div className="order-details-body">
@@ -70,7 +71,7 @@ export default function OrderDetailsModal({ order, productsBySku, onClose }) {
                 <div className="product-row" key={li.id}>
                   <div className="product-row-thumb">
                     {product?.imageUrl ? (
-                      <img src={product.imageUrl} alt={li.title} />
+                      <img src={product.imageUrl} alt={li.title} loading="lazy" decoding="async" />
                     ) : (
                       <div className="product-row-thumb-placeholder">No image</div>
                     )}

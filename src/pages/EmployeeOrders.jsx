@@ -122,7 +122,7 @@ export default function EmployeeOrders() {
           </button>
           <button
             type="button"
-            className="btn-ghost"
+            className="btn-ghost btn-danger-ghost"
             disabled={deletingId === r.id}
             onClick={() => handleDelete(r)}
           >
@@ -163,7 +163,7 @@ export default function EmployeeOrders() {
       {!loading && !error && items.length > 0 && (
         <>
           <DataTable columns={columns} rows={items} rowKey={(r) => r.id} />
-          <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+          <Pagination page={page} totalPages={totalPages} onChange={setPage} totalItems={total} pageSize={PAGE_SIZE} />
         </>
       )}
 

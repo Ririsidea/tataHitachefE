@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { viewDailyExport } from '../services/api';
 import AsyncState from './AsyncState';
+import { CloseIcon } from './Icons';
 
 export default function DailyExportViewModal({ exportId, onClose }) {
   const [data, setData] = useState(null);
@@ -43,7 +44,7 @@ export default function DailyExportViewModal({ exportId, onClose }) {
         aria-modal="true"
       >
         <button type="button" className="modal-close-btn no-print" onClick={onClose} aria-label="Close">
-          ✕
+          <CloseIcon />
         </button>
 
         <div className="order-details-body">

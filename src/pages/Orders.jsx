@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getOrders, cancelOrder, getStock } from '../services/api';
+import { getOrders, cancelOrder } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import { useAsyncData } from '../hooks/useAsyncData';
+import { useStock } from '../hooks/useStock';
 import AsyncState from '../components/AsyncState';
 import DataTable from '../components/DataTable';
 import Pagination from '../components/Pagination';
 import Badge, { toneForStatus } from '../components/Badge';
 import OrderDetailsModal from '../components/OrderDetailsModal';
+import EditOrderModal from '../components/EditOrderModal';
 
 const PAGE_SIZE = 10;
 
@@ -26,8 +29,9 @@ function formatDate(value) {
 }
 
 export default function Orders() {
-  const { data, loading, error, refetch } = useAsyncData(getOrders);
-  const { data: stockData } = useAsyncData(getStock);
+  const { user } = useAuth();
+  const { data, loading, error, refetch } = useAsyncData(() => getOrders(user?.email));
+  const { data: stockData, loading: stockLoading, error: stockError, refetch: refetchStock } = useStock();
   const orders = data?.data || [];
 
   const [fromDate, setFromDate] = useState('');
@@ -75,13 +79,36 @@ export default function Orders() {
   const [cancellingId, setCancellingId] = useState(null);
   const [actionError, setActionError] = useState(null);
   const [detailsOrder, setDetailsOrder] = useState(null);
+  const [editTarget, setEditTarget] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
+
+  // Auto-dismiss the success banner so it doesn't linger after the list has refreshed.
+  useEffect(() => {
+    if (!successMessage) return undefined;
+    const timer = setTimeout(() => setSuccessMessage(null), 5000);
+    return () => clearTimeout(timer);
+  }, [successMessage]);
+
+  // Full edit (items / address / contact) saved: refresh the orders AND the stock figures.
+  const handleEdited = (message) => {
+    setEditTarget(null);
+    setActionError(null);
+    setSuccessMessage(message);
+    refetch();
+    refetchStock();
+  };
 
   const handleCancel = async (order) => {
-    if (!window.confirm(`Cancel order ${order.shopifyOrderId || order.id}?`)) return;
+    if (!order.shopifyOrderId) {
+      setActionError('This order has no Shopify order id and cannot be cancelled');
+      return;
+    }
+    if (!window.confirm(`Cancel order ${order.shopifyOrderId}?`)) return;
     setActionError(null);
+    setSuccessMessage(null);
     setCancellingId(order.id);
     try {
-      await cancelOrder(order.id);
+      await cancelOrder(order.shopifyOrderId);
       refetch();
     } catch (err) {
       setActionError(err.message);
@@ -118,10 +145,14 @@ export default function Orders() {
           <button type="button" className="btn-ghost" onClick={() => setDetailsOrder(o)}>
             View Details
           </button>
+          {/* Open orders can be edited; any other status opens the same screen read-only, with the reason. */}
+          <button type="button" className="btn-ghost" onClick={() => setEditTarget(o)}>
+            {o.status === 'open' && o.canUpdate ? 'Update Order' : 'View Order'}
+          </button>
           {o.canCancel && (
             <button
               type="button"
-              className="btn-ghost"
+              className="btn-ghost btn-danger-ghost"
               disabled={cancellingId === o.id}
               onClick={() => handleCancel(o)}
             >
@@ -161,6 +192,7 @@ export default function Orders() {
         </div>
       )}
 
+      {successMessage && <div className="result result-success">{successMessage}</div>}
       {actionError && <div className="error">{actionError}</div>}
       <AsyncState
         loading={loading}
@@ -174,8 +206,23 @@ export default function Orders() {
       {!loading && !error && pageItems.length > 0 && (
         <>
           <DataTable columns={columns} rows={pageItems} rowKey={(o) => o.id} />
-          <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+          <Pagination page={page} totalPages={totalPages} onChange={setPage} totalItems={filteredOrders.length} pageSize={PAGE_SIZE} />
         </>
+      )}
+      {editTarget && (
+        <EditOrderModal
+          order={editTarget}
+          products={stockData?.data || []}
+          productsLoading={stockLoading && !stockData}
+          productsError={stockData ? null : stockError}
+          onRetryProducts={refetchStock}
+          onClose={() => setEditTarget(null)}
+          onSaved={handleEdited}
+          onChanged={() => {
+            refetch();
+            refetchStock();
+          }}
+        />
       )}
       {detailsOrder && (
         <OrderDetailsModal

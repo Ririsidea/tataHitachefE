@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { getStock } from '../services/api';
-import { useAsyncData } from '../hooks/useAsyncData';
+import { useStock } from '../hooks/useStock';
 import { useCart } from '../context/CartContext';
 import AsyncState from '../components/AsyncState';
+import ListSkeleton from '../components/ListSkeleton';
 import ProductRow from '../components/ProductRow';
 import Pagination from '../components/Pagination';
 import SearchInput from '../components/SearchInput';
@@ -11,7 +11,7 @@ import QuickViewModal from '../components/QuickViewModal';
 const PAGE_SIZE = 10;
 
 export default function Shop({ onViewCart }) {
-  const { data, loading, error } = useAsyncData(getStock);
+  const { data, loading, error } = useStock();
   const { itemCount } = useCart();
   const products = data?.data || [];
 
@@ -58,10 +58,11 @@ export default function Shop({ onViewCart }) {
           </button>
         )}
       </div>
+      {loading && <ListSkeleton variant="grid" />}
       <AsyncState
-        loading={loading}
-        error={error}
-        isEmpty={products.length === 0}
+        loading={false}
+        error={loading ? null : error}
+        isEmpty={!loading && products.length === 0}
         emptyLabel="No products found in Shopify."
       />
       {!loading && !error && products.length > 0 && (
@@ -81,13 +82,13 @@ export default function Shop({ onViewCart }) {
           </div>
           <AsyncState loading={false} error={null} isEmpty={filtered.length === 0} emptyLabel="No products match your search." />
           {filtered.length > 0 && (
-            <div className="product-list">
+            <div className="product-grid">
               {pageItems.map((p) => (
                 <ProductRow key={p.id} product={p} onQuickView={() => setQuickViewProductId(p.id)} />
               ))}
             </div>
           )}
-          <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+          <Pagination page={page} totalPages={totalPages} onChange={setPage} totalItems={filtered.length} pageSize={PAGE_SIZE} />
         </>
       )}
       {quickViewProductId && (

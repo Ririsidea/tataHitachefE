@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { resetPassword } from '../services/api';
 import PasswordInput from '../components/PasswordInput';
+import { AlertIcon, PackageIcon } from '../components/Icons';
 
 // Client-side mirror of the backend policy in src/utils/passwordPolicy.js on the
 // API side - this is only for fast feedback; the backend's check is the real one.
@@ -48,9 +49,15 @@ export default function ResetPassword({ initialEmail = '', onBackToLogin, onDone
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-brand">
+          <span className="auth-logo" aria-hidden="true">
+            <PackageIcon size={22} />
+          </span>
           <span className="auth-wordmark">TATA HITACHI</span>
         </div>
-        <h2>Reset password</h2>
+        <div className="auth-heading">
+          <h2>Reset password</h2>
+          <p className="hint">Choose a new password for your account.</p>
+        </div>
         <form className="form" onSubmit={handleSubmit}>
           <label>
             Email
@@ -83,7 +90,12 @@ export default function ResetPassword({ initialEmail = '', onBackToLogin, onDone
           <p className="hint">
             Must be 7+ characters with at least one letter, one number, and one special character.
           </p>
-          {error && <div className="error">{error}</div>}
+          {error && (
+            <div className="error" role="alert">
+              <AlertIcon size={18} />
+              <span>{error}</span>
+            </div>
+          )}
           <div className="auth-form-actions">
             <button type="button" className="btn-ghost" onClick={onBackToLogin} disabled={submitting}>
               Back to login

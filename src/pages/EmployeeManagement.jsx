@@ -3,9 +3,11 @@ import { listEmployees, addEmployee, deleteEmployee } from '../services/api';
 import { useAsyncData } from '../hooks/useAsyncData';
 import AsyncState from '../components/AsyncState';
 import DataTable from '../components/DataTable';
+import Badge from '../components/Badge';
 import Pagination from '../components/Pagination';
 import PasswordInput from '../components/PasswordInput';
 import SearchInput from '../components/SearchInput';
+import { CloseIcon } from '../components/Icons';
 
 const PAGE_SIZE = 10;
 
@@ -64,7 +66,7 @@ function AddEmployeeModal({ onClose, onAdded }) {
         aria-modal="true"
       >
         <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">
-          ✕
+          <CloseIcon />
         </button>
         <div className="modal-form-body">
           <h2>Add Employee</h2>
@@ -174,11 +176,11 @@ export default function EmployeeManagement() {
       label: '',
       render: (u) =>
         u.isAdmin ? (
-          <span className="hint">Admin</span>
+          <Badge tone="info">Admin</Badge>
         ) : (
           <button
             type="button"
-            className="btn-ghost"
+            className="btn-ghost btn-danger-ghost"
             disabled={deletingId === u.id}
             onClick={() => handleDelete(u)}
           >
@@ -212,7 +214,7 @@ export default function EmployeeManagement() {
           {pageItems.length > 0 && (
             <>
               <DataTable columns={columns} rows={pageItems} rowKey={(u) => u.id} />
-              <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+              <Pagination page={page} totalPages={totalPages} onChange={setPage} totalItems={filtered.length} pageSize={PAGE_SIZE} />
             </>
           )}
         </>

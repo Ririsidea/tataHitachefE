@@ -1,23 +1,26 @@
-import { useEffect, useState } from 'react';
-import Products from './pages/Products';
-import Orders from './pages/Orders';
-import EmployeeOrders from './pages/EmployeeOrders';
-import SapExport from './pages/SapExport';
-import EmployeeManagement from './pages/EmployeeManagement';
-import Shop from './pages/Shop';
-import Cart from './pages/Cart';
-import Checkout from './pages/Checkout';
-import OrderConfirmation from './pages/OrderConfirmation';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import Login from './pages/Login';
 import ResetPassword from './pages/ResetPassword';
 import Avatar from './components/Avatar';
-import Spinner from './components/Spinner';
+import Loader from './components/Loader';
 import { CartIcon, CloseIcon, MenuIcon, PackageIcon } from './components/Icons';
 import { CartProvider, useCart } from './context/CartContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { MAP_API_KEY_MISSING, MAP_API_KEY_MISSING_MESSAGE } from './services/api';
 import { clearStockCache, prefetchStock } from './hooks/useStock';
 import './App.css';
+
+// The signed-in pages load on demand, so the login screen does not pay for them.
+const Products = lazy(() => import('./pages/Products'));
+const Orders = lazy(() => import('./pages/Orders'));
+const EmployeeOrders = lazy(() => import('./pages/EmployeeOrders'));
+const SapExport = lazy(() => import('./pages/SapExport'));
+const EmployeeManagement = lazy(() => import('./pages/EmployeeManagement'));
+const OrderManagement = lazy(() => import('./pages/OrderManagement'));
+const Shop = lazy(() => import('./pages/Shop'));
+const Cart = lazy(() => import('./pages/Cart'));
+const Checkout = lazy(() => import('./pages/Checkout'));
+const OrderConfirmation = lazy(() => import('./pages/OrderConfirmation'));
 
 const TABS = [
   { key: 'products', label: 'Products / Stock' },
@@ -27,7 +30,10 @@ const TABS = [
   // { key: 'sap', label: 'SAP Export' },
 ];
 
-const ADMIN_TAB = { key: 'employees', label: 'Employee Management' };
+const ADMIN_TABS = [
+  { key: 'order-management', label: 'Order Management' },
+  { key: 'employees', label: 'Employee Management' },
+];
 
 function ShopFlow({ shopView, setShopView, lastOrder, setLastOrder }) {
   switch (shopView) {
@@ -100,13 +106,14 @@ function AppShell() {
     setNavOpen(false);
   };
 
-  const tabs = user?.isAdmin ? [...TABS, ADMIN_TAB] : TABS;
+  const tabs = user?.isAdmin ? [...TABS, ...ADMIN_TABS] : TABS;
 
   let body;
   if (activeTab === 'products') body = <Products />;
   else if (activeTab === 'orders') body = <Orders />;
   else if (activeTab === 'employee-orders') body = <EmployeeOrders />;
   else if (activeTab === 'sap') body = <SapExport />;
+  else if (activeTab === 'order-management') body = user?.isAdmin ? <OrderManagement /> : null;
   else if (activeTab === 'employees') body = user?.isAdmin ? <EmployeeManagement /> : null;
   else
     body = (
@@ -227,7 +234,7 @@ function AppShell() {
             {MAP_API_KEY_MISSING_MESSAGE}
           </div>
         )}
-        {body}
+        <Suspense fallback={<Loader show />}>{body}</Suspense>
       </main>
     </div>
   );
@@ -239,18 +246,13 @@ function AuthGate() {
   const [resetEmailHint, setResetEmailHint] = useState('');
   const [infoMessage, setInfoMessage] = useState(null);
 
+  let screen;
   if (checking) {
-    return (
-      <div className="app-loading">
-        <Spinner />
-      </div>
-    );
-  }
-
-  // Reset Password is only ever reached via the explicit link on the Login page -
-  // a successful login always goes straight to the dashboard, never through here.
-  if (!user && view === 'reset') {
-    return (
+    screen = null; // the stored token is being verified: only the loader is shown
+  } else if (!user && view === 'reset') {
+    // Reset Password is only ever reached via the explicit link on the Login page -
+    // a successful login always goes straight to the dashboard, never through here.
+    screen = (
       <ResetPassword
         initialEmail={resetEmailHint}
         onBackToLogin={() => {
@@ -263,10 +265,8 @@ function AuthGate() {
         }}
       />
     );
-  }
-
-  if (!user) {
-    return (
+  } else if (!user) {
+    screen = (
       <Login
         infoMessage={infoMessage}
         onForgotPassword={(typedEmail) => {
@@ -276,12 +276,19 @@ function AuthGate() {
         }}
       />
     );
+  } else {
+    screen = (
+      <CartProvider>
+        <AppShell />
+      </CartProvider>
+    );
   }
 
   return (
-    <CartProvider>
-      <AppShell />
-    </CartProvider>
+    <>
+      <Loader show={checking} />
+      {screen}
+    </>
   );
 }
 

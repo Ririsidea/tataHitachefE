@@ -95,11 +95,47 @@ export const getProductDetail = (id) => unwrap(keyClient.get(`/map/product/${id}
 export const createMapOrder = (payload) => unwrap(keyClient.post('/map/create-order', payload));
 export const getOrderStatus = (id) => unwrap(keyClient.get(`/map/order-status/${id}`));
 export const cancelOrder = (id) => unwrap(keyClient.post(`/map/orders/${id}/cancel`));
-export const updateOrder = (id, payload) => unwrap(keyClient.put(`/orders/${id}`, payload));
 // Live order for the Edit Order modal (address, contact, per-line unfulfilled quantity).
 export const getMapOrder = (id) => unwrap(keyClient.get(`/map/orders/${id}`));
 // Edit the order in Shopify. Resolves for 200 AND 207 (partial: check res.partial).
 export const editMapOrder = (id, payload) => unwrap(keyClient.put(`/map/orders/${id}`, payload));
+
+// Live order-status feed (Server-Sent Events). EventSource cannot send the x-api-key header, so
+// the stream is read with fetch. Resolves when the server closes the stream and rejects when it
+// cannot be opened or drops - the caller (hooks/useOrderEvents) reconnects either way.
+// employeeEmail limits the feed to that employee's orders; without it every order is streamed.
+export async function streamOrderEvents({ employeeEmail, signal, onOpen, onEvent }) {
+  if (MAP_API_KEY_MISSING) throw new Error(MAP_API_KEY_MISSING_MESSAGE);
+  const query = employeeEmail ? `?employeeEmail=${encodeURIComponent(employeeEmail)}` : '';
+  const response = await fetch(`${API_BASE_URL}/dashboard/order-events${query}`, {
+    headers: { ...TUNNEL_HEADERS, 'x-api-key': MAP_API_KEY, Accept: 'text/event-stream' },
+    signal,
+  });
+  if (!response.ok || !response.body) throw new Error(`Live updates unavailable (${response.status})`);
+  onOpen?.();
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return;
+    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+    let end;
+    while ((end = buffer.indexOf('\n\n')) >= 0) {
+      const block = buffer.slice(0, end);
+      buffer = buffer.slice(end + 2);
+      const eventName = /^event: (.+)$/m.exec(block)?.[1];
+      const data = /^data: (.*)$/m.exec(block)?.[1];
+      if (eventName !== 'order' || !data) continue; // ready / heartbeat blocks
+      try {
+        onEvent?.(JSON.parse(data));
+      } catch {
+        // a malformed event is skipped, the stream carries on
+      }
+    }
+  }
+}
 
 // ---- JWT routes ----------------------------------------------------------------------
 export const exportDaily = () => unwrap(client.post('/sap/export-daily'));
@@ -128,6 +164,13 @@ export async function downloadDailyExportFile(id, fileName) {
   link.remove();
   window.URL.revokeObjectURL(url);
 }
+
+// Admin Order Management. :shopifyOrderId is the Shopify order id (order.shopifyOrderId).
+export const listAdminOrders = ({ page = 1, pageSize = 10, q } = {}) =>
+  unwrap(client.get('/admin/orders', { params: { page, pageSize, ...(q ? { q } : {}) } }));
+export const markOrderPaid = (shopifyOrderId) => unwrap(client.post(`/admin/orders/${shopifyOrderId}/mark-paid`));
+export const markOrderFulfilled = (shopifyOrderId) =>
+  unwrap(client.post(`/admin/orders/${shopifyOrderId}/mark-fulfilled`));
 
 export const listEmployees = () => unwrap(client.get('/admin/employees'));
 export const addEmployee = (payload) => unwrap(client.post('/admin/employees', payload));

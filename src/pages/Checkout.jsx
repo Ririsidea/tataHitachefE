@@ -5,6 +5,7 @@ import { createMapOrder } from '../services/api';
 import { formatCurrency } from '../utils/formatters';
 import { INDIAN_STATES } from '../utils/indianStates';
 import { AlertIcon } from '../components/Icons';
+import Loader from '../components/Loader';
 
 const PHONE_PATTERN = /^[0-9]{10}$/;
 
@@ -50,6 +51,7 @@ export default function Checkout({ onBack, onOrderPlaced }) {
 
   return (
     <div className="panel">
+      <Loader show={submitting} label="Placing your order…" />
       <h2>Checkout</h2>
       <div className="checkout-layout">
         <form className="form checkout-form" onSubmit={handleSubmit}>
@@ -125,7 +127,6 @@ export default function Checkout({ onBack, onOrderPlaced }) {
               Back to Cart
             </button>
             <button type="submit" className="btn-primary" disabled={submitting || items.length === 0}>
-              {submitting && <span className="spinner-btn" />}
               {submitting ? 'Placing order...' : 'Place Order'}
             </button>
           </div>

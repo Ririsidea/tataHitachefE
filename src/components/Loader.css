@@ -1,0 +1,48 @@
+/* Full-screen page loader, modelled on the tatahitachi.co.in loader: white screen, one machine GIF. */
+.th-loader {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  z-index: 99999999;
+  opacity: 1;
+  transition: opacity 300ms ease;
+}
+
+.th-loader.is-leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.th-loader-machine {
+  display: block;
+  width: 150px;
+  height: auto;
+  max-width: 60vw;
+}
+
+.th-loader-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 479px) {
+  .th-loader-machine {
+    width: 120px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .th-loader {
+    transition: none;
+  }
+}

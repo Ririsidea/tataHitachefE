@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useStock } from '../hooks/useStock';
 import AsyncState from '../components/AsyncState';
-import ListSkeleton from '../components/ListSkeleton';
+import Loader from '../components/Loader';
 import DataTable from '../components/DataTable';
 import SearchInput from '../components/SearchInput';
 import Pagination from '../components/Pagination';
@@ -57,7 +57,7 @@ export default function Products() {
   return (
     <div className="panel">
       <h2>Products / Stock</h2>
-      {loading && <ListSkeleton />}
+      <Loader show={loading} />
       <AsyncState
         loading={false}
         error={loading ? null : error}

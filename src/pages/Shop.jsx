@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useStock } from '../hooks/useStock';
 import { useCart } from '../context/CartContext';
 import AsyncState from '../components/AsyncState';
-import ListSkeleton from '../components/ListSkeleton';
+import Loader from '../components/Loader';
 import ProductRow from '../components/ProductRow';
 import Pagination from '../components/Pagination';
 import SearchInput from '../components/SearchInput';
@@ -58,7 +58,7 @@ export default function Shop({ onViewCart }) {
           </button>
         )}
       </div>
-      {loading && <ListSkeleton variant="grid" />}
+      <Loader show={loading} />
       <AsyncState
         loading={false}
         error={loading ? null : error}

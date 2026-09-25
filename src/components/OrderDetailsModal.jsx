@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import Badge, { toneForStatus } from './Badge';
+import { formatStatusLabel } from '../utils/formatters';
 import { formatCurrency } from '../utils/formatters';
 import { CloseIcon } from './Icons';
 
@@ -47,6 +48,12 @@ export default function OrderDetailsModal({ order, productsBySku, onClose }) {
               <div className="order-summary-row">
                 <span>Fulfillment Status</span>
                 <Badge tone={toneForStatus(order.fulfillmentStatus)}>{order.fulfillmentStatus}</Badge>
+              </div>
+            )}
+            {order.deliveryStatus && (
+              <div className="order-summary-row">
+                <span>Delivery Status</span>
+                <Badge tone={toneForStatus(order.deliveryStatus)}>{formatStatusLabel(order.deliveryStatus)}</Badge>
               </div>
             )}
             {order.trackingNumber && (

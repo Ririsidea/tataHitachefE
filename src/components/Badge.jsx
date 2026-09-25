@@ -1,6 +1,6 @@
-const WARNING_WORDS = ['pending', 'partial', 'unpaid', 'unfulfilled', 'authorized', 'on hold'];
+const WARNING_WORDS = ['pending', 'partial', 'unpaid', 'unfulfilled', 'authorized', 'on hold', 'attempted', 'ready_for_pickup'];
 const SUCCESS_WORDS = ['paid', 'fulfilled', 'delivered', 'success', 'active', 'complete'];
-const DANGER_WORDS = ['cancelled', 'canceled', 'refunded', 'voided', 'failed', 'error', 'out of stock'];
+const DANGER_WORDS = ['cancelled', 'canceled', 'refunded', 'voided', 'failed', 'failure', 'error', 'out of stock'];
 
 export function toneForStatus(value) {
   const normalized = String(value || '').toLowerCase();

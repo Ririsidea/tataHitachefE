@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getMapOrder, editMapOrder } from '../services/api';
-import Spinner from './Spinner';
+import Loader from './Loader';
 import QuantityStepper from './QuantityStepper';
 import AddProductSearch from './AddProductSearch';
 import ProductThumb from './ProductThumb';
@@ -28,7 +28,7 @@ import {
   stockMap,
   validateForm,
 } from '../utils/orderEdit';
-import { CloseIcon, LockIcon } from './Icons';
+import { CloseIcon } from './Icons';
 
 const FLASH_MS = 1800;
 
@@ -75,6 +75,17 @@ export default function EditOrderModal({ order, products, productsLoading = fals
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order.id]);
+
+  // The order was fulfilled while this screen is open: it turns read-only at once, so an
+  // edit is never even attempted. (The backend refuses it regardless.)
+  useEffect(() => {
+    if (!order.locked) return;
+    setDetail((d) =>
+      d && d.editable
+        ? { ...d, editable: false, locked: true, readOnlyReason: 'Order is fulfilled - it can no longer be edited' }
+        : d
+    );
+  }, [order.locked]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -159,11 +170,7 @@ export default function EditOrderModal({ order, products, productsLoading = fals
         <div className="modal-form-body edit-order-body">
           <h2>{title}</h2>
 
-          {loading && (
-            <div className="async-loading">
-              <Spinner />
-            </div>
-          )}
+          <Loader show={loading || saving} label={saving ? 'Saving changes…' : 'Loading order…'} />
           {loadError && (
             <>
               <div className="error">{loadError}</div>
@@ -216,7 +223,7 @@ export default function EditOrderModal({ order, products, productsLoading = fals
                               <>
                                 <span className={`stock-tag stock-${stockInfo.tone}`}>{stockInfo.text}</span>
                                 {line.isNew && <span className="in-order-tag">New</span>}
-                                {line.locked && <span className="in-order-tag"><LockIcon size={11} /> {line.lockedReason || 'Already fulfilled - cannot be changed'}</span>}
+                                {line.locked && <span className="in-order-tag">{line.lockedReason || 'Already fulfilled - cannot be changed'}</span>}
                               </>
                             )}
                           </span>
@@ -371,7 +378,6 @@ export default function EditOrderModal({ order, products, productsLoading = fals
                   Back to editing
                 </button>
                 <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
-                  {saving && <span className="spinner-btn" />}
                   {saving ? 'Saving...' : 'Save changes'}
                 </button>
               </div>
@@ -383,7 +389,7 @@ export default function EditOrderModal({ order, products, productsLoading = fals
   );
 }
 
-// Fulfilled / cancelled / closed orders: show what the order looks like and why it is locked.
+// Fulfilled / cancelled / closed orders: show what the order looks like and why it can no longer be edited.
 function ReadOnlyView({ detail, onClose }) {
   const a = detail.shippingAddress || {};
   return (

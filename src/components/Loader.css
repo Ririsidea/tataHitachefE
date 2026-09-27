@@ -1,4 +1,4 @@
-/* Full-screen page loader, modelled on the tatahitachi.co.in loader: white screen, one machine GIF. */
+/* Full-screen page loader: white screen with the dotted spinner. */
 .th-loader {
   position: fixed;
   inset: 0;
@@ -16,13 +16,6 @@
   pointer-events: none;
 }
 
-.th-loader-machine {
-  display: block;
-  width: 150px;
-  height: auto;
-  max-width: 60vw;
-}
-
 .th-loader-label {
   position: absolute;
   width: 1px;
@@ -33,12 +26,6 @@
   clip: rect(0 0 0 0);
   white-space: nowrap;
   border: 0;
-}
-
-@media (max-width: 479px) {
-  .th-loader-machine {
-    width: 120px;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

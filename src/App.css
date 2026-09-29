@@ -325,6 +325,18 @@
   line-height: 1.45;
 }
 
+.toast-success {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+  border: 1px solid rgba(20, 122, 88, 0.28);
+  padding: 11px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+  margin-bottom: 12px;
+}
+
 .error > svg {
   flex-shrink: 0;
   margin-top: 1px;
@@ -445,6 +457,18 @@
 @keyframes loader-spin {
   100% {
     transform: rotate(1turn);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The app-wide reduced-motion reset (src/index.css) forces every animation to a single
+     0.01ms frame, which would leave this spinner frozen instead of rotating. A loading
+     indicator is functional, not decorative, so it keeps spinning here - just slower - and
+     needs !important to outrank that !important reset. */
+  .spinner,
+  .spinner-btn::before {
+    animation-duration: 2.5s !important;
+    animation-iteration-count: infinite !important;
   }
 }
 
@@ -827,6 +851,53 @@
   color: var(--color-danger);
 }
 
+.combobox {
+  position: relative;
+}
+
+.combobox-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-hover);
+}
+
+.combobox-option {
+  padding: 9px 10px;
+  border-radius: var(--radius-xs);
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: background var(--ease), color var(--ease);
+}
+
+.combobox-option:hover,
+.combobox-option.is-highlighted {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.combobox-option[aria-selected='true'] {
+  font-weight: 600;
+}
+
+.combobox-empty {
+  padding: 9px 10px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
 .password-field {
   position: relative;
 }
@@ -953,6 +1024,34 @@
 
 .auth-card .form {
   max-width: none;
+}
+
+.login-type-toggle {
+  display: flex;
+  padding: 3px;
+  background: var(--color-bg-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.login-type-option {
+  flex: 1;
+  padding: 8px 0;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--ease), color var(--ease), box-shadow var(--ease);
+}
+
+.login-type-option.is-active {
+  background: var(--color-bg);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-card);
 }
 
 .auth-brand {
@@ -1331,7 +1430,8 @@
 }
 
 /* ---------------------------------------------------------------------- */
-/* Pagination                                                               */
+/* Cursor pagination: Previous / status / Next - no page-number list, since */
+/* a cursor has no notion of jumping to an arbitrary page.                  */
 /* ---------------------------------------------------------------------- */
 
 .pagination {
@@ -1349,106 +1449,46 @@
   font-variant-numeric: tabular-nums;
 }
 
-.pagination-full {
+.pagination-compact {
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  max-width: 420px;
 }
 
-.pagination-compact {
-  display: none;
-}
-
-.pagination-arrow,
-.pagination-page,
 .pagination-step {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
+  flex: 1 1 0;
+  max-width: 160px;
   min-width: 44px;
   height: 44px;
-  padding: 0 10px;
+  padding: 0 14px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
   background: var(--color-bg);
-  color: var(--color-text-secondary);
+  color: var(--color-text-primary);
   font: inherit;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   cursor: pointer;
   transition: background var(--ease), border-color var(--ease), color var(--ease);
 }
 
-.pagination-arrow {
-  font-size: 22px;
-  line-height: 1;
-}
-
-.pagination-step {
-  gap: 6px;
-  padding: 0 14px;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
-.pagination-arrow:hover:not(:disabled),
-.pagination-page:hover,
 .pagination-step:hover:not(:disabled) {
   border-color: var(--color-border-strong);
   background: var(--color-bg-subtle);
   color: var(--color-text-primary);
 }
 
-.pagination-arrow:disabled,
 .pagination-step:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-}
-
-.pagination-page.active,
-.pagination-page.active:hover {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: var(--color-on-primary);
-  font-weight: 700;
-}
-
-.pagination-gap {
-  min-width: 24px;
-  text-align: center;
-  color: var(--color-text-secondary);
-  user-select: none;
-}
-
-.pagination-status {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text-primary);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-/* Phones: no page-number list, just Prev / "Page x of y" / Next. */
-@media (max-width: 639px) {
-  .pagination-full {
-    display: none;
-  }
-
-  .pagination-compact {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    width: 100%;
-  }
-
-  .pagination-step {
-    flex: 1 1 0;
-    max-width: 132px;
-  }
 }
 
 /* ---------------------------------------------------------------------- */
@@ -2899,6 +2939,12 @@
 /* Product list: search, category filter, results                           */
 /* ---------------------------------------------------------------------- */
 
+.catalog-toolbar-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 .catalog-toolbar {
   display: flex;
   align-items: flex-end;
@@ -2911,46 +2957,6 @@
   max-width: 440px;
 }
 
-.catalog-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 150px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-}
-
-.catalog-field select {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 100%;
-  min-height: var(--control-h);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 400;
-  padding: 0 34px 0 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border-strong);
-  background: var(--color-bg);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238a857f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  color: var(--color-text-primary);
-  cursor: pointer;
-  transition: border-color var(--ease), box-shadow var(--ease);
-}
-
-.catalog-field select:hover:not(:focus) {
-  border-color: var(--color-text-muted);
-}
-
-.catalog-field select:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-ring);
-}
-
 .catalog-clear {
   align-self: flex-end;
 }
@@ -2960,11 +2966,47 @@
     flex: 1 1 100%;
     max-width: none;
   }
+}
 
-  .catalog-field {
-    flex: 1 1 0;
-    min-width: 0;
+.pill-skeleton {
+  display: inline-block;
+  width: 84px;
+  height: 33px;
+  border-radius: 999px;
+  background: var(--color-bg-muted);
+  animation: pill-skeleton-pulse 1.2s ease-in-out infinite;
+}
+
+.pill-skeleton:nth-child(2) {
+  width: 68px;
+  animation-delay: 0.1s;
+}
+
+.pill-skeleton:nth-child(3) {
+  width: 100px;
+  animation-delay: 0.2s;
+}
+
+@keyframes pill-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.6;
   }
+  50% {
+    opacity: 1;
+  }
+}
+
+.categories-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.categories-hint .btn-ghost {
+  min-height: 28px;
+  padding: 0 12px;
+  font-size: 13px;
 }
 
 .catalog-results {

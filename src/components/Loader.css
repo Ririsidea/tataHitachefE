@@ -1,11 +1,11 @@
-/* Full-screen page loader: white screen with the dotted spinner. */
+/* Full-screen page loader: black screen with the dotted spinner. */
 .th-loader {
   position: fixed;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fff;
+  background: #000;
   z-index: 99999999;
   opacity: 1;
   transition: opacity 300ms ease;

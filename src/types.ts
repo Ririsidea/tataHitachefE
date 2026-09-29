@@ -7,25 +7,27 @@ export interface User {
   id: number | string;
   name?: string | null;
   email: string;
+  employeeId?: string;
   phone?: string | null;
   isAdmin?: boolean;
 }
 
-/** Pagination block of every list endpoint: { success, data: [...], meta }. */
-export interface PageMeta {
-  page: number;
+/** Cursor pagination block of every list endpoint: { success, data: [...], pageInfo }.
+ *  `offset` is the 0-based index of the first row in `data`, for a "Showing X-Y of Z" line. */
+export interface PageInfo {
   limit: number;
+  offset: number;
   total: number;
-  totalPages: number;
   hasNextPage: boolean;
-  hasPrevPage: boolean;
+  hasPreviousPage: boolean;
+  nextCursor: string | null;
+  previousCursor: string | null;
   filters?: Record<string, unknown>;
-  facets?: { categories?: string[] };
 }
 
 export interface Paged<T> {
   data: T[];
-  meta: PageMeta;
+  pageInfo: PageInfo;
 }
 
 /** One variant row of GET /api/map/stock. */
@@ -100,7 +102,12 @@ export type OrderStage =
 
 export interface Order {
   id: number | string;
+  // The Shopify order id: the order number shown to users and the id every order API takes.
   shopifyOrderId?: string | number | null;
+  // The employee the order was placed for.
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
   status?: string;
   financialStatus?: string | null;
   fulfillmentStatus?: string | null;
@@ -137,7 +144,17 @@ export interface Employee {
   id: number | string;
   name?: string | null;
   email: string;
+  employeeId: string;
+  phone?: string | null;
   isAdmin?: boolean;
+}
+
+/** GET /api/map/pincode/:pin - the state, district and valid city names for that PIN. */
+export interface PincodeInfo {
+  pincode: string;
+  state: string;
+  district: string;
+  cities: string[];
 }
 
 export interface ShippingAddress {
@@ -149,8 +166,8 @@ export interface ShippingAddress {
 }
 
 export interface CreateOrderPayload {
-  employeeName?: string | null;
-  employeeEmail?: string;
+  name?: string | null;
+  email?: string;
   phone: string;
   items: { sku: string; quantity: number }[];
   shippingAddress: ShippingAddress;
@@ -170,7 +187,8 @@ export interface ApiError extends Error {
 }
 
 export interface CatalogParams {
-  page: number;
+  // Cursor pagination is handled separately - see lib/cursor.ts and hooks/useCatalog.ts - so it
+  // is never part of this object.
   q: string;
   category: string;
   color: string;

@@ -3,9 +3,10 @@ import { cancelOrder } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useLiveOrders } from '../hooks/useLiveOrders';
 import { useSkuProducts } from '../hooks/useSkuProducts';
+import { useCursor } from '../hooks/useCursor';
 import AsyncState from '../components/AsyncState';
 import DataTable from '../components/DataTable';
-import Pagination from '../components/Pagination';
+import CursorPagination from '../components/CursorPagination';
 import Badge, { toneForStatus } from '../components/Badge';
 import Loader from '../components/Loader';
 import { formatStatusLabel } from '../utils/formatters';
@@ -22,43 +23,46 @@ export default function Orders() {
   const { user } = useAuth();
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
-  const [page, setPage] = useState(1);
+  const { cursor, setCursor, reset: resetCursor } = useCursor();
 
-  // The list is one page (50, newest first) read from the server with the date range as a
-  // filter - the range is the employee's local days, sent as exact instants.
-  const { orders, meta, loading, error, refetch } = useLiveOrders(user?.email, {
-    page,
+  // The list is one cursor page (default 50, newest first) read from the server with the date
+  // range as a filter - the range is the employee's local days, sent as exact instants.
+  const { orders, pageInfo, loading, error, refetch } = useLiveOrders(user?.email, {
+    ...cursor,
     fromDate: startOfLocalDay(fromDate),
     toDate: endOfLocalDay(toDate),
   });
   // The full-screen loader is only for the first load; a reload after a cancel or a page
   // change keeps the inline spinner in the panel.
-  const firstLoad = loading && orders.length === 0 && meta === null;
+  const firstLoad = loading && orders.length === 0 && pageInfo === null;
   const hasRange = Boolean(fromDate || toDate);
 
-  // Orders were removed from under this page (e.g. the last one on it): step back to the last page.
+  // Orders were removed from under this page (e.g. cancelling the last one on it): step back.
   useEffect(() => {
-    if (meta && !loading && orders.length === 0 && meta.totalPages > 0 && page > meta.totalPages) setPage(meta.totalPages);
-  }, [meta, loading, orders.length, page]);
+    if (pageInfo && !loading && orders.length === 0 && pageInfo.hasPreviousPage && pageInfo.previousCursor) {
+      setCursor({ before: pageInfo.previousCursor });
+    }
+  }, [pageInfo, loading, orders.length, setCursor]);
 
   const handleFilterChange = (setter: (value: string) => void) => (e: ChangeEvent<HTMLInputElement>) => {
     setter(e.target.value);
-    setPage(1);
+    resetCursor();
   };
 
   const handleClearFilters = () => {
     setFromDate('');
     setToDate('');
-    setPage(1);
+    resetCursor();
   };
-  const [cancellingId, setCancellingId] = useState<Order['id'] | null>(null);
+  // Orders are identified by their Shopify order id everywhere (details, cancel, status).
+  const [cancellingId, setCancellingId] = useState<Order['shopifyOrderId'] | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  // The open modal follows its order by id, so a live status change shows up inside it too.
-  const [detailsId, setDetailsId] = useState<Order['id'] | null>(null);
-  const detailsOrder = detailsId == null ? null : orders.find((o) => o.id === detailsId) || null;
+  // The open modal follows its order by Shopify order id, so a live status change shows up inside it too.
+  const [detailsId, setDetailsId] = useState<Order['shopifyOrderId'] | null>(null);
+  const detailsOrder = detailsId == null ? null : orders.find((o) => o.shopifyOrderId === detailsId) || null;
   // Images for the items of the order whose details are open (looked up by SKU, not the whole catalog).
   const productsBySku = useSkuProducts(detailsOrder?.lineItems?.map((li) => li.sku));
-  const setDetailsOrder = (order: Order | null) => setDetailsId(order ? order.id : null);
+  const setDetailsOrder = (order: Order | null) => setDetailsId(order ? order.shopifyOrderId ?? null : null);
 
   const handleCancel = async (order: Order) => {
     if (!order.shopifyOrderId) {
@@ -67,7 +71,7 @@ export default function Orders() {
     }
     if (!window.confirm(`Cancel order ${order.shopifyOrderId}?`)) return;
     setActionError(null);
-    setCancellingId(order.id);
+    setCancellingId(order.shopifyOrderId);
     try {
       await cancelOrder(order.shopifyOrderId);
       refetch();
@@ -121,10 +125,10 @@ export default function Orders() {
             <button
               type="button"
               className="btn-ghost btn-danger-ghost"
-              disabled={cancellingId === o.id}
+              disabled={cancellingId === o.shopifyOrderId}
               onClick={() => handleCancel(o)}
             >
-              {cancellingId === o.id ? 'Cancelling...' : 'Cancel Order'}
+              {cancellingId === o.shopifyOrderId ? 'Cancelling...' : 'Cancel Order'}
             </button>
           )}
         </div>
@@ -137,11 +141,11 @@ export default function Orders() {
       <div className="panel-header">
         <h2>Orders</h2>
         <span className="hint">
-          {meta ? meta.total : 0} order{meta?.total === 1 ? '' : 's'}
+          {pageInfo ? pageInfo.total : 0} order{pageInfo?.total === 1 ? '' : 's'}
         </span>
       </div>
 
-      {!error && meta && (meta.total > 0 || hasRange) && (
+      {!error && pageInfo && (pageInfo.total > 0 || hasRange) && (
         <div className="filters-row">
           <label>
             From
@@ -164,13 +168,13 @@ export default function Orders() {
       <AsyncState
         loading={loading && !firstLoad}
         error={error}
-        isEmpty={!loading && !error && meta !== null && meta.total === 0}
+        isEmpty={!loading && !error && !!pageInfo && pageInfo.total === 0}
         emptyLabel={hasRange ? 'No orders in this date range.' : 'No orders yet.'}
       />
       {!error && orders.length > 0 && (
         <>
           <DataTable columns={columns} rows={orders} rowKey={(o) => o.id} />
-          {meta && <Pagination page={meta.page} totalPages={meta.totalPages} onChange={setPage} totalItems={meta.total} pageSize={meta.limit} />}
+          {pageInfo && <CursorPagination pageInfo={pageInfo} onCursor={setCursor} />}
         </>
       )}
       {detailsOrder && (

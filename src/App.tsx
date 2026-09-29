@@ -31,7 +31,6 @@ const TABS: Tab[] = [
   { key: 'shop', label: 'Shop' },
   { key: 'orders', label: 'Orders' },
   { key: 'employee-orders', label: 'Employee Orders' },
-  // { key: 'sap', label: 'SAP Export' },
 ];
 
 const ADMIN_TABS: Tab[] = [
@@ -172,7 +171,7 @@ function AppShell() {
               </span>
               <div className="app-brand-text">
                 <span className="eyebrow">Tata Hitachi</span>
-                <h1 title="MAP Ordering Portal">MAP Ordering Portal</h1>
+                {/* <h1 title="MAP Ordering Portal">MAP Ordering Portal</h1> */}
               </div>
             </div>
             <div className="app-header-actions">

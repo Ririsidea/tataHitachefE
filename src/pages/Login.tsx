@@ -8,9 +8,13 @@ interface LoginProps {
   onForgotPassword: (email: string) => void;
 }
 
+type LoginType = 'email' | 'employeeId';
+
 export default function Login({ infoMessage, onForgotPassword }: LoginProps) {
   const { login } = useAuth();
+  const [loginType, setLoginType] = useState<LoginType>('email');
   const [email, setEmail] = useState('');
+  const [employeeId, setEmployeeId] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +24,7 @@ export default function Login({ infoMessage, onForgotPassword }: LoginProps) {
     setSubmitting(true);
     setError(null);
     try {
-      await login(email, password);
+      await login(loginType === 'email' ? { loginType: 'email', email, password } : { loginType: 'employeeId', employeeId, password });
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -47,17 +51,54 @@ export default function Login({ infoMessage, onForgotPassword }: LoginProps) {
           </div>
         )}
         <form className="form" onSubmit={handleSubmit}>
-          <label>
-            Email
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="username"
-              required
-              autoFocus
-            />
-          </label>
+          <div className="login-type-toggle" role="radiogroup" aria-label="Log in with">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={loginType === 'email'}
+              className={`login-type-option${loginType === 'email' ? ' is-active' : ''}`}
+              onClick={() => setLoginType('email')}
+            >
+              Email
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={loginType === 'employeeId'}
+              className={`login-type-option${loginType === 'employeeId' ? ' is-active' : ''}`}
+              onClick={() => setLoginType('employeeId')}
+            >
+              Employee ID
+            </button>
+          </div>
+          {loginType === 'email' ? (
+            <label>
+              Email
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="username"
+                required
+                autoFocus
+              />
+            </label>
+          ) : (
+            <label>
+              Employee ID
+              <input
+                type="text"
+                value={employeeId}
+                onChange={(e) => setEmployeeId(e.target.value.replace(/\D/g, '').slice(0, 5))}
+                placeholder="5-digit employee ID"
+                inputMode="numeric"
+                autoComplete="username"
+                maxLength={5}
+                required
+                autoFocus
+              />
+            </label>
+          )}
           <label>
             Password
             <PasswordInput

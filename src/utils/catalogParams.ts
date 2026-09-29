@@ -1,9 +1,10 @@
 // Product list state <-> URL query string <-> GET /api/map/stock parameters.
 // Pure functions (no React, no window) - unit-tested in test/catalogParams.test.ts.
 //
-//   params: { page, q, category, color, size, inStock ('' | 'true' | 'false'),
+//   params: { q, category, color, size, inStock ('' | 'true' | 'false'),
 //             minPrice, maxPrice, sort ('' = server default), order }
-// Everything but `page` is a string ('' = not set), so it round-trips through a URL untouched.
+// Everything is a string ('' = not set), so it round-trips through a URL untouched. Cursor
+// pagination (after/before) is not part of this object - see lib/cursor.ts and hooks/useCatalog.ts.
 
 import type { CatalogParams } from '../types';
 
@@ -13,7 +14,7 @@ type CatalogKey = 'q' | FilterKey | 'sort' | 'order';
 export const EMPTY_FILTERS: Record<FilterKey, string> = { category: '', color: '', size: '', inStock: '', minPrice: '', maxPrice: '' };
 export const FILTER_KEYS = Object.keys(EMPTY_FILTERS) as FilterKey[];
 export const CATALOG_KEYS: CatalogKey[] = ['q', ...FILTER_KEYS, 'sort', 'order'];
-export const DEFAULT_PARAMS: CatalogParams = { page: 1, q: '', ...EMPTY_FILTERS, sort: '', order: '' };
+export const DEFAULT_PARAMS: CatalogParams = { q: '', ...EMPTY_FILTERS, sort: '', order: '' };
 
 const NUMBER = /^\d+(\.\d+)?$/;
 
@@ -21,11 +22,9 @@ export function parseSearch(search: string): CatalogParams {
   const query = new URLSearchParams(search);
   const text = (key: string) => (query.get(key) || '').trim();
   const number = (key: string) => (NUMBER.test(text(key)) ? text(key) : '');
-  const page = /^\d+$/.test(query.get('page') || '') ? Number(query.get('page')) : 1;
   const inStock = text('inStock');
 
   return {
-    page: page >= 1 ? page : 1,
     q: text('q').slice(0, 100),
     category: text('category'),
     color: text('color'),
@@ -41,7 +40,6 @@ export function parseSearch(search: string): CatalogParams {
 // Only what differs from the defaults goes in the URL, so the plain list has a clean address.
 export function toSearch(params: CatalogParams): string {
   const query = new URLSearchParams();
-  if (params.page > 1) query.set('page', String(params.page));
   for (const key of CATALOG_KEYS) {
     if (params[key]) query.set(key, params[key]);
   }
@@ -52,15 +50,16 @@ export function toSearch(params: CatalogParams): string {
 // (for instance `tab`). Returns a string starting with "?" - or "" when nothing is left.
 export function mergeSearch(currentSearch: string, catalogSearch: string): string {
   const merged = new URLSearchParams(currentSearch);
-  for (const key of ['page', ...CATALOG_KEYS]) merged.delete(key);
+  for (const key of CATALOG_KEYS) merged.delete(key);
   for (const [key, value] of new URLSearchParams(catalogSearch)) merged.set(key, value);
   const text = merged.toString();
   return text ? `?${text}` : '';
 }
 
-// The request for GET /api/map/stock. Empty values are left out; the page size is the server's.
+// The request for GET /api/map/stock. Empty values are left out; limit is always sent
+// explicitly (the first page is ?limit=50, same as every other list).
 export function toApiParams(params: CatalogParams): Record<string, string | number> {
-  const api: Record<string, string | number> = { page: params.page };
+  const api: Record<string, string | number> = { limit: 50 };
   for (const key of CATALOG_KEYS) {
     if (params[key]) api[key] = params[key];
   }

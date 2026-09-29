@@ -21,7 +21,7 @@ function unlockScroll() {
   if (scrollLocks === 0) document.body.style.overflow = savedOverflow;
 }
 
-// Full-screen loader: white screen with the dotted spinner. Shown for at least 400ms, fades out
+// Full-screen loader: black screen with the dotted spinner. Shown for at least 400ms, fades out
 // over 300ms once `show` turns false, and is unmounted afterwards.
 export default function Loader({ show, label = 'Loading…' }: { show: boolean; label?: string }) {
   const [phase, setPhase] = useState<'hidden' | 'visible' | 'leaving'>(show ? 'visible' : 'hidden');

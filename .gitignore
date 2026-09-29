@@ -13,8 +13,9 @@ dist-ssr
 *.local
 .env
 
-# Tests
-test/
+# One-off before/after screenshots from a manual UI audit - not part of the app,
+# the test suite, or the docs.
+audit-screenshots/
 
 # Editor directories and files
 .vscode/*

@@ -1,37 +1,46 @@
-import { useCallback, useEffect, useState } from 'react';
-import { getOrders } from '../services/api';
-import type { Order, PageMeta } from '../types';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { getOrders, isRequestCancelled, type OrderParams } from '../services/api';
+import { cleanParams } from '../lib/cursor';
+import type { Order, PageInfo } from '../types';
 
-// One page (50) of the signed-in employee's orders - `filters` is { page, fromDate, toDate } - loaded
-// with loading / error state and re-read on demand (refetch, e.g. after a cancel).
+// One cursor page (default 50) of the signed-in employee's orders - `filters` is { after,
+// before, fromDate, toDate } - loaded with loading / error state and re-read on demand
+// (refetch, e.g. after a cancel). Any request still in flight for the previous filters is
+// aborted when they change or the component unmounts.
 export function useLiveOrders(
-  employeeEmail: string | undefined,
-  { page = 1, fromDate, toDate }: { page?: number; fromDate?: string; toDate?: string } = {}
+  email: string | undefined,
+  { after, before, fromDate, toDate }: { after?: string; before?: string; fromDate?: string; toDate?: string } = {}
 ) {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [meta, setMeta] = useState<PageMeta | null>(null);
+  const [pageInfo, setPageInfo] = useState<PageInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const queryKey = JSON.stringify({ employeeEmail, page, fromDate, toDate });
+  const queryKey = JSON.stringify({ email, after, before, fromDate, toDate });
+  const controllerRef = useRef<AbortController | null>(null);
 
   const load = useCallback(async () => {
-    if (!employeeEmail) return;
+    if (!email) return;
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
     setLoading(true);
     try {
-      const res = await getOrders(JSON.parse(queryKey));
+      const res = await getOrders(cleanParams(JSON.parse(queryKey)) as OrderParams, controller.signal);
       setOrders(res.data || []);
-      setMeta(res.meta);
+      setPageInfo(res.pageInfo);
       setError(null);
     } catch (err) {
+      if (isRequestCancelled(err)) return;
       setError((err as Error).message);
     } finally {
-      setLoading(false);
+      if (controllerRef.current === controller) setLoading(false);
     }
-  }, [employeeEmail, queryKey]);
+  }, [email, queryKey]);
 
   useEffect(() => {
     load();
+    return () => controllerRef.current?.abort();
   }, [load]);
 
-  return { orders, meta, loading, error, refetch: load };
+  return { orders, pageInfo, loading, error, refetch: load };
 }

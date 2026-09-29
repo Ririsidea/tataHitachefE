@@ -4,13 +4,13 @@ import { useCart } from '../context/CartContext';
 import CatalogToolbar from '../components/CatalogToolbar';
 import CatalogResults from '../components/CatalogResults';
 import ProductRow from '../components/ProductRow';
-import Pagination from '../components/Pagination';
+import CursorPagination from '../components/CursorPagination';
 import QuickViewModal from '../components/QuickViewModal';
 
 export default function Shop({ onViewCart }: { onViewCart: () => void }) {
   const catalog = useCatalog();
   const { itemCount } = useCart();
-  const { data, meta } = catalog;
+  const { data, pageInfo } = catalog;
 
   // The variant the customer clicked - the quick view opens that product with it selected.
   const [quickViewKey, setQuickViewKey] = useState<string | number | null>(null);
@@ -33,15 +33,7 @@ export default function Shop({ onViewCart }: { onViewCart: () => void }) {
           ))}
         </div>
       </CatalogResults>
-      {meta && (
-        <Pagination
-          page={meta.page}
-          totalPages={meta.totalPages}
-          onChange={(page) => catalog.update({ page })}
-          totalItems={meta.total}
-          pageSize={meta.limit}
-        />
-      )}
+      {pageInfo && <CursorPagination pageInfo={pageInfo} onCursor={catalog.setCursor} />}
       {quickViewKey && <QuickViewModal productKey={quickViewKey} onClose={() => setQuickViewKey(null)} />}
     </div>
   );

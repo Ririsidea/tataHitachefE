@@ -2,9 +2,10 @@ import { useState, type ChangeEvent } from 'react';
 import { listDailyExports, deleteDailyExport, downloadDailyExportFile } from '../services/api';
 import AsyncState from '../components/AsyncState';
 import DataTable from '../components/DataTable';
-import Pagination from '../components/Pagination';
+import CursorPagination from '../components/CursorPagination';
 import DailyExportViewModal from '../components/DailyExportViewModal';
 import { usePagedList } from '../hooks/usePagedList';
+import { useCursor } from '../hooks/useCursor';
 import type { DailyExport, DataColumn } from '../types';
 
 function formatDateTime(value?: string | null) {
@@ -22,16 +23,16 @@ function formatDate(value?: string | null) {
 }
 
 export default function EmployeeOrders() {
-  const [page, setPage] = useState(1);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
-  const { items: rows, meta, loading, error, refetch } = usePagedList(
+  const { cursor, setCursor, reset: resetCursor } = useCursor();
+  const { items: rows, pageInfo, loading, error, refetch } = usePagedList(
     listDailyExports,
-    { page, from: fromDate || undefined, to: toDate || undefined },
-    setPage
+    { ...cursor, from: fromDate || undefined, to: toDate || undefined },
+    (previousCursor) => setCursor({ before: previousCursor })
   );
   const items = rows || [];
-  const total = meta?.total ?? 0;
+  const total = pageInfo?.total ?? 0;
 
   const [viewingId, setViewingId] = useState<DailyExport['id'] | null>(null);
   const [downloadingId, setDownloadingId] = useState<DailyExport['id'] | null>(null);
@@ -40,13 +41,13 @@ export default function EmployeeOrders() {
 
   const handleFilterChange = (setter: (value: string) => void) => (e: ChangeEvent<HTMLInputElement>) => {
     setter(e.target.value);
-    setPage(1);
+    resetCursor();
   };
 
   const handleClearFilters = () => {
     setFromDate('');
     setToDate('');
-    setPage(1);
+    resetCursor();
   };
 
   const handleDownload = async (record: DailyExport) => {
@@ -139,7 +140,7 @@ export default function EmployeeOrders() {
       {!error && items.length > 0 && (
         <>
           <DataTable columns={columns} rows={items} rowKey={(r) => r.id} />
-          {meta && <Pagination page={meta.page} totalPages={meta.totalPages} onChange={setPage} totalItems={meta.total} pageSize={meta.limit} />}
+          {pageInfo && <CursorPagination pageInfo={pageInfo} onCursor={setCursor} />}
         </>
       )}
 

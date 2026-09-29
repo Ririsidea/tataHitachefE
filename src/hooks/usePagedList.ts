@@ -1,28 +1,35 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { PageMeta, Paged } from '../types';
+import { isRequestCancelled } from '../services/api';
+import { cleanParams } from '../lib/cursor';
+import type { PageInfo, Paged } from '../types';
 
-// One page (50 rows, ?page=) of a list endpoint that follows the shared contract
-// { success, data: [...], meta: { page, limit, total, totalPages, hasNextPage, hasPrevPage, filters } }.
+// One cursor page (default 50 rows, ?limit=/?after=/?before=) of a list endpoint that follows
+// the shared contract { success, data: [...], pageInfo: { limit, offset, total, hasNextPage,
+// hasPreviousPage, nextCursor, previousCursor, filters } }.
 //
-//   fetchPage(params)  -> the parsed response ({ data, meta }); `params` always carries `page`
-//   params             page + the endpoint's filters; a new value (compared by content) loads again
-//   onPastEnd(last)    called when the requested page is past the last one (rows were removed since),
-//                      so the screen can step back to page `last`
+//   fetchPage(params, signal)  the parsed response ({ data, pageInfo }); `params` carries the
+//                              current cursor (after/before, if any) plus the endpoint's filters
+//   params                     a new value (compared by content) loads again
+//   onPastEnd(previousCursor)  called when the requested page comes back empty but an earlier
+//                              page exists (rows were removed since, e.g. a delete just above the
+//                              last row on this page) - the screen steps back with this cursor
 // While a new page loads the previous rows stay in `items`, so the list does not flash empty.
-// Returns { items, meta, loading, error, refetch }.
+// Any request still in flight for the previous params is aborted when params change or the
+// component unmounts, so a slow response can never overwrite fresher data.
+// Returns { items, pageInfo, loading, error, refetch }.
 interface PagedListState<T> {
   items: T[] | null;
-  meta: PageMeta | null;
+  pageInfo: PageInfo | null;
   loading: boolean;
   error: string | null;
 }
 
-export function usePagedList<T, P extends { page: number }>(
-  fetchPage: (params: P) => Promise<Paged<T>>,
+export function usePagedList<T, P extends { after?: string; before?: string }>(
+  fetchPage: (params: P, signal?: AbortSignal) => Promise<Paged<T>>,
   params: P,
-  onPastEnd?: (lastPage: number) => void
+  onPastEnd?: (previousCursor: string) => void
 ) {
-  const [state, setState] = useState<PagedListState<T>>({ items: null, meta: null, loading: true, error: null });
+  const [state, setState] = useState<PagedListState<T>>({ items: null, pageInfo: null, loading: true, error: null });
   const [reloadToken, setReloadToken] = useState(0);
   const key = JSON.stringify(params);
   const latest = useRef({ fetchPage, onPastEnd });
@@ -31,22 +38,20 @@ export function usePagedList<T, P extends { page: number }>(
   });
 
   useEffect(() => {
-    let active = true;
+    const controller = new AbortController();
     setState((prev) => ({ ...prev, error: null, loading: true }));
     latest.current
-      .fetchPage(JSON.parse(key) as P)
+      .fetchPage(cleanParams(JSON.parse(key)) as P, controller.signal)
       .then((res) => {
-        if (!active) return;
-        setState({ items: res.data, meta: res.meta, loading: false, error: null });
-        const { page, totalPages } = res.meta;
-        if (res.data.length === 0 && totalPages > 0 && page > totalPages) latest.current.onPastEnd?.(totalPages);
+        setState({ items: res.data, pageInfo: res.pageInfo, loading: false, error: null });
+        const { total, hasPreviousPage, previousCursor } = res.pageInfo;
+        if (res.data.length === 0 && total > 0 && hasPreviousPage && previousCursor) latest.current.onPastEnd?.(previousCursor);
       })
       .catch((err: Error) => {
-        if (active) setState((prev) => ({ ...prev, loading: false, error: err.message }));
+        if (isRequestCancelled(err)) return;
+        setState((prev) => ({ ...prev, loading: false, error: err.message }));
       });
-    return () => {
-      active = false;
-    };
+    return () => controller.abort();
   }, [key, reloadToken]);
 
   const refetch = useCallback(() => setReloadToken((n) => n + 1), []);

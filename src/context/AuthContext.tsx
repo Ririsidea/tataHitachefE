@@ -1,12 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { login as apiLogin, getMe, TOKEN_STORAGE_KEY } from '../services/api';
+import { login as apiLogin, getMe, TOKEN_STORAGE_KEY, type LoginPayload } from '../services/api';
 import type { User } from '../types';
 
 interface AuthContextValue {
   user: User | null;
   token: string | null;
   checking: boolean;
-  login: (email: string, password: string) => Promise<User>;
+  login: (payload: LoginPayload) => Promise<User>;
   logout: () => void;
   refreshUser: () => Promise<User>;
 }
@@ -53,8 +53,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('auth:unauthorized', logout);
   }, [logout]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const res = await apiLogin(email, password);
+  const login = useCallback(async (payload: LoginPayload) => {
+    const res = await apiLogin(payload);
     localStorage.setItem(TOKEN_STORAGE_KEY, res.data.token);
     setToken(res.data.token);
     setUser(res.data.user);

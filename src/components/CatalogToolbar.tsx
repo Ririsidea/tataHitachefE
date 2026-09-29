@@ -1,19 +1,19 @@
 import { useEffect, useState } from 'react';
 import SearchInput from './SearchInput';
+import { useAsyncData } from '../hooks/useAsyncData';
+import { getAllCategories } from '../services/api';
 import type { Catalog } from '../hooks/useCatalog';
 
 const SEARCH_DEBOUNCE_MS = 300;
 
-// The facet value that equals `current` ignoring case, so the <select> shows it as selected.
-const matchValue = (list: string[], current: string) => list.find((v) => v.toLowerCase() === current.toLowerCase()) ?? current;
-const withCurrent = (list: string[], current: string) => (current && !list.includes(matchValue(list, current)) ? [current, ...list] : list);
-
-// Search box (debounced) and the category filter of the product list, in one row.
+// Search box (debounced), category pills and a "Clear filters" link for the product list.
+// Category names are read from GET /api/map/stock itself (every row already carries its own
+// `category` - see services/api.ts getAllCategories), not a separate facets field.
 //   catalog: what useCatalog() returns.
 export default function CatalogToolbar({ catalog, placeholder }: { catalog: Catalog; placeholder?: string }) {
-  const { params, update, clear, meta } = catalog;
+  const { params, update, clear } = catalog;
   const [text, setText] = useState(params.q);
-  const categories = withCurrent(meta?.facets?.categories || [], params.category);
+  const { data: categories, loading: categoriesLoading, error: categoriesError, refetch: retryCategories } = useAsyncData(getAllCategories);
 
   // The URL changed under us (back button, "Clear filters"): show what it says.
   useEffect(() => {
@@ -29,25 +29,50 @@ export default function CatalogToolbar({ catalog, placeholder }: { catalog: Cata
   }, [text]);
 
   return (
-    <div className="catalog-toolbar">
-      <SearchInput value={text} onChange={setText} placeholder={placeholder} className="catalog-search" />
-      {categories.length > 0 && (
-        <label className="catalog-field">
-          <span>Category</span>
-          <select value={matchValue(categories, params.category)} onChange={(e) => update({ category: e.target.value })}>
-            <option value="">All categories</option>
-            {categories.map((category) => (
-              <option key={category} value={category}>
-                {category}
-              </option>
-            ))}
-          </select>
-        </label>
+    <div className="catalog-toolbar-wrap">
+      <div className="catalog-toolbar">
+        <SearchInput value={text} onChange={setText} placeholder={placeholder} className="catalog-search" />
+        {(params.category || params.q) && (
+          <button type="button" className="btn-ghost catalog-clear" onClick={clear}>
+            Clear filters
+          </button>
+        )}
+      </div>
+      {categoriesLoading && (
+        <div className="category-pills category-pills-loading" aria-hidden="true">
+          <span className="pill-skeleton" />
+          <span className="pill-skeleton" />
+          <span className="pill-skeleton" />
+        </div>
       )}
-      {(params.category || params.q) && (
-        <button type="button" className="btn-ghost catalog-clear" onClick={clear}>
-          Clear filters
-        </button>
+      {!categoriesLoading && categoriesError && (
+        <div className="hint categories-hint">
+          <span>Couldn't load categories.</span>
+          <button type="button" className="btn-ghost" onClick={retryCategories}>
+            Retry
+          </button>
+        </div>
+      )}
+      {!categoriesLoading && !categoriesError && categories && categories.length > 0 && (
+        <div className="category-pills" role="group" aria-label="Filter by category">
+          <button
+            type="button"
+            className={params.category ? 'pill' : 'pill pill-active'}
+            onClick={() => update({ category: '' })}
+          >
+            All
+          </button>
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              className={params.category === cat ? 'pill pill-active' : 'pill'}
+              onClick={() => update({ category: params.category === cat ? '' : cat })}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );

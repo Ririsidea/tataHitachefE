@@ -2,7 +2,7 @@ import { useCatalog } from '../hooks/useCatalog';
 import CatalogToolbar from '../components/CatalogToolbar';
 import CatalogResults from '../components/CatalogResults';
 import DataTable from '../components/DataTable';
-import Pagination from '../components/Pagination';
+import CursorPagination from '../components/CursorPagination';
 import { ImageIcon } from '../components/Icons';
 import { formatCurrency } from '../utils/formatters';
 import type { DataColumn, StockRow } from '../types';
@@ -37,7 +37,7 @@ const COLUMNS: DataColumn<StockRow>[] = [
 
 export default function Products() {
   const catalog = useCatalog();
-  const { data, meta } = catalog;
+  const { data, pageInfo } = catalog;
 
   return (
     <div className="panel">
@@ -46,15 +46,7 @@ export default function Products() {
       <CatalogResults catalog={catalog}>
         <DataTable columns={COLUMNS} rows={data || []} rowKey={(p) => p.variantId} />
       </CatalogResults>
-      {meta && (
-        <Pagination
-          page={meta.page}
-          totalPages={meta.totalPages}
-          onChange={(page) => catalog.update({ page })}
-          totalItems={meta.total}
-          pageSize={meta.limit}
-        />
-      )}
+      {pageInfo && <CursorPagination pageInfo={pageInfo} onCursor={catalog.setCursor} />}
     </div>
   );
 }

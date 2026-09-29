@@ -1,7 +1,8 @@
 import axios, { type AxiosResponse } from 'axios';
+import { cleanParams } from '../lib/cursor';
 import type {
-  ApiError, ApiResult, CreateOrderPayload, DailyExport, DailyExportView, Employee, Order, Paged, ProductDetail,
-  StockRow, User,
+  ApiError, ApiResult, CreateOrderPayload, DailyExport, DailyExportView, Employee, Order, Paged, PincodeInfo,
+  ProductDetail, StockRow, User,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
@@ -18,6 +19,15 @@ export const TOKEN_STORAGE_KEY = 'tata_h_auth_token';
 // config already allows it; it is only sent when the API is actually served through ngrok.
 const TUNNEL_HEADERS: Record<string, string> = /ngrok/i.test(API_BASE_URL) ? { 'ngrok-skip-browser-warning': 'true' } : {};
 
+// Every list endpoint's params (after/before especially) come from React state that starts
+// at '' rather than undefined - cleaned here, once, with the same lib/cursor.ts helper every
+// list hook itself already applies at the call site, so '' / null / undefined are never sent
+// as a query parameter even for an endpoint that forgets to clean its own params.
+function stripEmptyParams(params: unknown): unknown {
+  if (!params || typeof params !== 'object') return params;
+  return cleanParams(params as Record<string, unknown>);
+}
+
 const client = axios.create({ baseURL: API_BASE_URL, headers: TUNNEL_HEADERS });
 
 // The MAP API key comes from VITE_MAP_API_KEY in the frontend .env (Vite only exposes
@@ -32,6 +42,11 @@ if (MAP_API_KEY_MISSING) {
 const keyClient = axios.create({
   baseURL: API_BASE_URL,
   headers: { ...TUNNEL_HEADERS, ...(MAP_API_KEY ? { 'x-api-key': MAP_API_KEY } : {}) },
+});
+
+keyClient.interceptors.request.use((config) => {
+  config.params = stripEmptyParams(config.params);
+  return config;
 });
 
 // No key configured: fail fast with a clear message instead of a silent 401 round-trip.
@@ -54,6 +69,7 @@ client.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  config.params = stripEmptyParams(config.params);
   return config;
 });
 
@@ -71,11 +87,17 @@ client.interceptors.response.use(
   }
 );
 
+// True when `err` is a request this same client aborted (AbortController.abort()) rather than
+// a real failure - callers ignore these instead of showing an error (see hooks/useCatalog.ts etc,
+// which abort a stale in-flight request whenever their params change or the component unmounts).
+export const isRequestCancelled = (err: unknown): boolean => axios.isCancel(err);
+
 async function unwrap<T>(promise: Promise<AxiosResponse<T>>): Promise<T> {
   try {
     const { data } = await promise;
     return data;
   } catch (err) {
+    if (isRequestCancelled(err)) throw err;
     const failure = err as { response?: { status?: number; data?: { requestId?: string; message?: string } }; message: string };
     const status = failure.response?.status;
     const requestId = failure.response?.data?.requestId;
@@ -89,53 +111,97 @@ async function unwrap<T>(promise: Promise<AxiosResponse<T>>): Promise<T> {
   }
 }
 
-export const login = (email: string, password: string) =>
-  unwrap<ApiResult<{ token: string; user: User }>>(client.post('/auth/login', { email, password }));
+export type LoginPayload = { loginType: 'email'; email: string; password: string } | { loginType: 'employeeId'; employeeId: string; password: string };
+export const login = (payload: LoginPayload) =>
+  unwrap<ApiResult<{ token: string; user: User }>>(client.post('/auth/login', payload));
 export const resetPassword = (email: string, newPassword: string) =>
   unwrap<ApiResult<unknown>>(client.post('/auth/reset-password', { email, newPassword }));
 export const getMe = () => unwrap<ApiResult<User>>(client.get('/auth/me'));
 
 // ---- x-api-key routes (no JWT) -------------------------------------------------------
-// One page (50) of an employee's orders, newest first: { data, meta }. `params`: employeeEmail (required,
-// taken from the logged-in profile), page, status, fromDate, toDate.
+// One cursor page (default 50) of an employee's orders, newest first: { data, pageInfo }.
+// `params`: email (required, taken from the logged-in profile), limit, after, before,
+// status, fromDate, toDate. `signal` cancels a stale request (see hooks/useLiveOrders.ts).
 export interface OrderParams {
-  employeeEmail?: string;
-  page?: number;
+  email?: string;
+  limit?: number;
+  after?: string;
+  before?: string;
   status?: string;
   fromDate?: string;
   toDate?: string;
 }
-export const getOrders = (params: OrderParams) =>
-  unwrap<Paged<Order>>(keyClient.get('/dashboard/orders', { params }));
-// Product list + search, always one page of 50 variant rows: { data, meta }. `params` are the
-// query parameters (page, q, sku, category, color, size, inStock, minPrice, maxPrice, sort, order, fresh).
+export const getOrders = (params: OrderParams, signal?: AbortSignal) =>
+  unwrap<Paged<Order>>(keyClient.get('/dashboard/orders', { params, signal }));
+// Product list + search, one cursor page (default 50) of variant rows: { data, pageInfo }.
+// `params` are the query parameters (limit, after, before, q, sku, category, color, size,
+// inStock, minPrice, maxPrice, sort, order, fresh). `signal` cancels a stale request.
 export type StockParams = Record<string, string | number | undefined>;
-export const getStock = (params: StockParams) => unwrap<Paged<StockRow>>(keyClient.get('/map/stock', { params }));
+export const getStock = (params: StockParams, signal?: AbortSignal) =>
+  unwrap<Paged<StockRow>>(keyClient.get('/map/stock', { params, signal }));
 
-// Rows for exactly these SKUs. The list is paged 50 at a time, so this follows the pages;
-// SKUs go out in batches to keep the URL short.
+// Rows for exactly these SKUs. The list is paged 50 at a time, so this follows the cursor
+// (pageInfo.nextCursor) until it runs out; SKUs go out in batches to keep the URL short.
 const SKU_BATCH = 40;
 export async function getStockBySkus(skus: (string | null | undefined)[]): Promise<StockRow[]> {
   const unique = [...new Set(skus.filter((sku): sku is string => Boolean(sku)))];
   const rows: StockRow[] = [];
   for (let i = 0; i < unique.length; i += SKU_BATCH) {
     const sku = unique.slice(i, i + SKU_BATCH).join(',');
-    for (let page = 1, more = true; more; page += 1) {
-      const res = await getStock({ sku, page });
+    let after: string | undefined;
+    let more = true;
+    while (more) {
+      const res = await getStock({ sku, limit: 50, after });
       rows.push(...res.data);
-      more = res.meta.hasNextPage;
+      more = res.pageInfo.hasNextPage;
+      after = res.pageInfo.nextCursor ?? undefined;
     }
   }
   return rows;
 }
 
+// Distinct category names across the whole catalog. GET /api/map/stock has no separate facets
+// field for this (each row already carries its own `category`), so this follows the cursor
+// through every row once - the catalog is small (a few hundred variants) and the backend itself
+// caches it for ~60s, so this is cheap. Cached for the session; call resetCategoriesCache()
+// after a catalog change (for example a "fresh" reload) to pick up new categories.
+let categoriesCache: string[] | null = null;
+export function resetCategoriesCache(): void {
+  categoriesCache = null;
+}
+export async function getAllCategories(): Promise<string[]> {
+  if (categoriesCache) return categoriesCache;
+  const categories = new Set<string>();
+  let after: string | undefined;
+  let more = true;
+  while (more) {
+    const res = await getStock({ limit: 50, after });
+    for (const row of res.data) {
+      if (row.category) categories.add(row.category);
+    }
+    more = res.pageInfo.hasNextPage;
+    after = res.pageInfo.nextCursor ?? undefined;
+  }
+  categoriesCache = [...categories].sort((a, b) => a.localeCompare(b));
+  return categoriesCache;
+}
+
 // One product by product id, variant id, SKU or handle (see matchedBy / matchedVariantId in the reply).
 export const getProductDetail = (key: string | number) =>
   unwrap<ApiResult<ProductDetail>>(keyClient.get(`/map/product/${encodeURIComponent(key)}`));
+// A PIN's state, district and the exact city names validate-address / create-order accept for
+// it - Checkout's PIN-first address flow: type the PIN, get the state and a city dropdown back.
+export const getPincode = (pin: string) =>
+  unwrap<ApiResult<PincodeInfo>>(keyClient.get(`/map/pincode/${encodeURIComponent(pin)}`));
+export const validateMapAddress = (payload: { country: string; state: string; city: string; pincode: string }) =>
+  unwrap<ApiResult<{ valid: true; pincode: string; state: string; city: string }>>(keyClient.post('/map/validate-address', payload));
 export const createMapOrder = (payload: CreateOrderPayload) =>
   unwrap<ApiResult<Order>>(keyClient.post('/map/create-order', payload));
-export const getOrderStatus = (id: string | number) => unwrap<ApiResult<Order>>(keyClient.get(`/map/order-status/${id}`));
-export const cancelOrder = (id: string | number) => unwrap<ApiResult<unknown>>(keyClient.post(`/map/orders/${id}/cancel`));
+// Both take the Shopify order id (order.shopifyOrderId), never the internal order id.
+export const getOrderStatus = (shopifyOrderId: string | number) =>
+  unwrap<ApiResult<Order>>(keyClient.get(`/map/order-status/${shopifyOrderId}`));
+export const cancelOrder = (shopifyOrderId: string | number) =>
+  unwrap<ApiResult<unknown>>(keyClient.post(`/map/orders/${shopifyOrderId}/cancel`));
 
 // ---- JWT routes ----------------------------------------------------------------------
 export interface DailyExportResult {
@@ -146,9 +212,10 @@ export interface DailyExportResult {
 export const exportDaily = () => unwrap<DailyExportResult>(client.post('/sap/export-daily'));
 
 // Employee Orders page: one row per daily export, not per order.
-// One page (50) of the signed-in employee's daily exports: { data, meta }. `params`: page, from, to (YYYY-MM-DD).
-export const listDailyExports = (params: { page: number; from?: string; to?: string }) =>
-  unwrap<Paged<DailyExport>>(client.get('/sap/daily-exports', { params }));
+// One cursor page (default 50) of the signed-in employee's daily exports: { data, pageInfo }.
+// `params`: limit, after, before, from, to (YYYY-MM-DD). `signal` cancels a stale request.
+export const listDailyExports = (params: { limit?: number; after?: string; before?: string; from?: string; to?: string }, signal?: AbortSignal) =>
+  unwrap<Paged<DailyExport>>(client.get('/sap/daily-exports', { params, signal }));
 export const viewDailyExport = (id: string | number) =>
   unwrap<ApiResult<DailyExportView>>(client.get(`/sap/daily-exports/${id}/view`));
 export const deleteDailyExport = (id: string | number) =>
@@ -169,11 +236,19 @@ export async function downloadDailyExportFile(id: string | number, fileName?: st
   window.URL.revokeObjectURL(url);
 }
 
-// One page (50) of employees, newest first: { data, meta }. `params`: page, q (name or email).
-export const listEmployees = (params: { page: number; q?: string }) =>
-  unwrap<Paged<Employee>>(client.get('/admin/employees', { params }));
-export const addEmployee = (payload: { name: string; email: string; password: string }) =>
-  unwrap<ApiResult<Employee>>(client.post('/admin/employees', payload));
+// One cursor page (default 50) of employees, newest first: { data, pageInfo }.
+// `params`: limit, after, before, q (name or email). `signal` cancels a stale request.
+export const listEmployees = (params: { limit?: number; after?: string; before?: string; q?: string }, signal?: AbortSignal) =>
+  unwrap<Paged<Employee>>(client.get('/admin/employees', { params, signal }));
+export const addEmployee = (payload: { name: string; email: string; employeeId: string; phone?: string; password: string }) =>
+  unwrap<ApiResult<{ employee: Employee; temporaryPassword?: string }>>(client.post('/admin/employees', payload));
+// newPassword is optional - send it only when the admin actually set a new one; missing or
+// omitted leaves the employee's current password unchanged. passwordChanged in the response
+// says whether it was applied.
+export const updateEmployee = (
+  id: string | number,
+  payload: { name?: string; email?: string; employeeId?: string; phone?: string; newPassword?: string }
+) => unwrap<ApiResult<Employee> & { passwordChanged: boolean }>(client.put(`/admin/employees/${id}`, payload));
 export const deleteEmployee = (id: string | number) => unwrap<ApiResult<unknown>>(client.delete(`/admin/employees/${id}`));
 
 export default API_BASE_URL;
